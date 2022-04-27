@@ -29,7 +29,13 @@ COMPARE_FILES=(
 "kernel/tracepoint.c"                
 "lib/iov_iter.c"                     
 "mm/memory.c"                        
-"security/tomoyo/network.c"         
+"security/tomoyo/network.c"
+"arch/arm/include/asm/vdso_datapage.h"
+"arch/arm/kernel/vdso.c"
+"arch/arm/vdso/vdso.lds.S"
+"arch/arm/vdso/vgettimeofday.c"
+"kernel/time/time.c"
+"kernel/time/timekeeping.c"
 )
 
 DIR_FILE_DIR=
