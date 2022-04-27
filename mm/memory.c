@@ -3837,7 +3837,11 @@ void __might_fault(const char *file, int line)
 	 * get paged out, therefore we'll never actually fault, and the
 	 * below annotations will generate false positives.
 	 */
+#ifndef CONFIG_KERNEL_MODE_LINUX
 	if (segment_eq(get_fs(), KERNEL_DS))
+#else
+	if (segment_eq(get_fs(), KERNEL_DS) && !test_thread_flag(TIF_KU))
+#endif
 		return;
 	if (pagefault_disabled())
 		return;

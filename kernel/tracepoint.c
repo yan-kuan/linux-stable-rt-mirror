@@ -524,6 +524,11 @@ void for_each_kernel_tracepoint(void (*fct)(struct tracepoint *tp, void *priv),
 }
 EXPORT_SYMBOL_GPL(for_each_kernel_tracepoint);
 
+void trace_call_by_kml(void)
+{
+	trace_printk("called\n");
+}
+EXPORT_SYMBOL_GPL(trace_call_by_kml);
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
 
 /* NB: reg/unreg are called while guarded with the tracepoints_mutex */
