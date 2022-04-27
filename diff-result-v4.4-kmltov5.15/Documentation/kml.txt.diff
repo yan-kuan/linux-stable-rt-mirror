@@ -1,0 +1,56 @@
+diff --git a/Documentation/kml.txt b/Documentation/kml.txt
+deleted file mode 100644
+index 5ae61c80b1d7..000000000000
+--- a/Documentation/kml.txt
++++ /dev/null
+@@ -1,50 +0,0 @@
+-Kernel Mode Linux (http://web.yl.is.s.u-tokyo.ac.jp/~tosh/kml)
+-Copyright 2004,2005 Toshiyuki Maeda
+-
+-
+-Introduction:
+-
+-Kernel Mode Linux is a technology which enables us to execute user programs
+-in kernel mode. In Kernel Mode Linux, user programs can be executed as
+-user processes that have the privilege level of kernel mode. The benefit
+-of executing user programs in kernel mode is that the user programs can
+-access kernel address space directly.  For example, user programs can invoke
+-system calls very fast because it is unnecessary to switch between a kernel
+-mode and user-mode by using costly software interruptions or context
+-switches. In addition, user programs are executed as ordinary processes
+-(except for their privilege level, of course), so scheduling and paging are
+-performed as usual, unlike kernel modules.
+-
+-Although it seems dangerous to let user programs access a kernel directly,
+-safety of the kernel can be ensured by several means: static type checking
+-technology, proof-carrying code technology, software fault isolation, and
+-so forth. For proof of concept, we are developing a system which is based
+-on the combination of Kernel Mode Linux and Typed Assembly Language, TAL.
+-(TAL can ensure safety of programs through its type checking and the type
+-checking can be done at machine binary level. For more information about
+-TAL, see http://www.cs.cornell.edu/talc)
+-
+-Currently, ARM architecture are supported.
+-
+-
+-Instruction:
+-
+-To enable Kernel Mode Linux, say Y in Kernel Mode Linux field of kernel
+-configuration, build and install the kernel, and reboot your machine. Then,
+-all executables under the "/trusted" directory are executed in kernel mode
+-in the current Kernel Mode Linux implementation. For example, to execute a
+-program named "cat" in kernel mode, copy the program to "/trusted" and
+-execute it as follows:
+-
+-% /trusted/cat
+-
+-
+-Implementation Notes for ARM:
+-
+-To execute user programs in kernel mode, Kernel Mode Linux has a special
+-start_thread (start_kernel_thread) routine, which is called in processing
+-execve(2) and sets registers of a user process to specified initial values.
+-The start_kernel_thread routine sets the CPSR register as SYSTEM mode and
+-authorize this process the access of the kernel address by set_fs(KERNEL_DS).
+-
+-
