@@ -80,8 +80,14 @@ VERSION
 {
 	LINUX_2.6 {
 	global:
+		clock_gettime;
 		__vdso_clock_gettime;
+		gettimeofday;
 		__vdso_gettimeofday;
+		kernel_sched_timeout;
+		__vdso_kernel_sched_timeout;
+		sched_yield;
+		__vdso_sched_yield;
 	local: *;
 	};
 }

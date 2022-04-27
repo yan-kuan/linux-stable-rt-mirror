@@ -23,6 +23,7 @@
 #include <asm/bug.h>
 #include <asm/page.h>
 #include <asm/unistd.h>
+#include <asm/uaccess.h>
 #include <asm/vdso_datapage.h>
 
 #ifndef CONFIG_AEABI
@@ -59,210 +60,98 @@ static notrace int vdso_read_retry(const struct vdso_data *vdata, u32 start)
 	return vdata->seq_count != start;
 }
 
-static notrace long clock_gettime_fallback(clockid_t _clkid,
-					   struct timespec *_ts)
-{
-	register struct timespec *ts asm("r1") = _ts;
-	register clockid_t clkid asm("r0") = _clkid;
-	register long ret asm ("r0");
-	register long nr asm("r7") = __NR_clock_gettime;
-
-	asm volatile(
-	"	swi #0\n"
-	: "=r" (ret)
-	: "r" (clkid), "r" (ts), "r" (nr)
-	: "memory");
-
-	return ret;
-}
-
-static notrace int do_realtime_coarse(struct timespec *ts,
-				      struct vdso_data *vdata)
+static notrace unsigned long get_syscall_addr(struct vdso_data *vdata, unsigned int num)
 {
 	u32 seq;
+	unsigned long addr;
+
+	if (num >= __NR_syscalls)
+		return 0;
 
 	do {
 		seq = vdso_read_begin(vdata);
-
-		ts->tv_sec = vdata->xtime_coarse_sec;
-		ts->tv_nsec = vdata->xtime_coarse_nsec;
-
+		addr = vdata->sys_call_table[num];
 	} while (vdso_read_retry(vdata, seq));
 
-	return 0;
+	return addr;
+
 }
 
-static notrace int do_monotonic_coarse(struct timespec *ts,
-				       struct vdso_data *vdata)
-{
-	struct timespec tomono;
-	u32 seq;
-
-	do {
-		seq = vdso_read_begin(vdata);
-
-		ts->tv_sec = vdata->xtime_coarse_sec;
-		ts->tv_nsec = vdata->xtime_coarse_nsec;
-
-		tomono.tv_sec = vdata->wtm_clock_sec;
-		tomono.tv_nsec = vdata->wtm_clock_nsec;
-
-	} while (vdso_read_retry(vdata, seq));
-
-	ts->tv_sec += tomono.tv_sec;
-	timespec_add_ns(ts, tomono.tv_nsec);
-
-	return 0;
-}
-
-#ifdef CONFIG_ARM_ARCH_TIMER
-
-static notrace u64 get_ns(struct vdso_data *vdata)
-{
-	u64 cycle_delta;
-	u64 cycle_now;
-	u64 nsec;
-
-	cycle_now = arch_counter_get_cntvct();
-
-	cycle_delta = (cycle_now - vdata->cs_cycle_last) & vdata->cs_mask;
-
-	nsec = (cycle_delta * vdata->cs_mult) + vdata->xtime_clock_snsec;
-	nsec >>= vdata->cs_shift;
-
-	return nsec;
-}
-
-static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
-{
-	u64 nsecs;
-	u32 seq;
-
-	do {
-		seq = vdso_read_begin(vdata);
-
-		if (!vdata->tk_is_cntvct)
-			return -1;
-
-		ts->tv_sec = vdata->xtime_clock_sec;
-		nsecs = get_ns(vdata);
-
-	} while (vdso_read_retry(vdata, seq));
-
-	ts->tv_nsec = 0;
-	timespec_add_ns(ts, nsecs);
-
-	return 0;
-}
-
-static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
-{
-	struct timespec tomono;
-	u64 nsecs;
-	u32 seq;
-
-	do {
-		seq = vdso_read_begin(vdata);
-
-		if (!vdata->tk_is_cntvct)
-			return -1;
-
-		ts->tv_sec = vdata->xtime_clock_sec;
-		nsecs = get_ns(vdata);
-
-		tomono.tv_sec = vdata->wtm_clock_sec;
-		tomono.tv_nsec = vdata->wtm_clock_nsec;
-
-	} while (vdso_read_retry(vdata, seq));
-
-	ts->tv_sec += tomono.tv_sec;
-	ts->tv_nsec = 0;
-	timespec_add_ns(ts, nsecs + tomono.tv_nsec);
-
-	return 0;
-}
-
-#else /* CONFIG_ARM_ARCH_TIMER */
-
-static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
-{
-	return -1;
-}
-
-static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
-{
-	return -1;
-}
-
-#endif /* CONFIG_ARM_ARCH_TIMER */
-
+int clock_gettime(clockid_t clkid, struct timespec *ts)
+__attribute__((weak, alias("__vdso_clock_gettime")));
 notrace int __vdso_clock_gettime(clockid_t clkid, struct timespec *ts)
 {
 	struct vdso_data *vdata;
 	int ret = -1;
+	unsigned long syscall_addr =0;
 
 	vdata = __get_datapage();
-
-	switch (clkid) {
-	case CLOCK_REALTIME_COARSE:
-		ret = do_realtime_coarse(ts, vdata);
-		break;
-	case CLOCK_MONOTONIC_COARSE:
-		ret = do_monotonic_coarse(ts, vdata);
-		break;
-	case CLOCK_REALTIME:
-		ret = do_realtime(ts, vdata);
-		break;
-	case CLOCK_MONOTONIC:
-		ret = do_monotonic(ts, vdata);
-		break;
-	default:
-		break;
-	}
-
-	if (ret)
-		ret = clock_gettime_fallback(clkid, ts);
+	syscall_addr = get_syscall_addr(vdata, __NR_clock_gettime);
+	ret = ((int (*)(clockid_t which_clock, struct timespec *tp))syscall_addr)(
+		clkid, ts);
 
 	return ret;
 }
 
-static notrace long gettimeofday_fallback(struct timeval *_tv,
-					  struct timezone *_tz)
-{
-	register struct timezone *tz asm("r1") = _tz;
-	register struct timeval *tv asm("r0") = _tv;
-	register long ret asm ("r0");
-	register long nr asm("r7") = __NR_gettimeofday;
-
-	asm volatile(
-	"	swi #0\n"
-	: "=r" (ret)
-	: "r" (tv), "r" (tz), "r" (nr)
-	: "memory");
-
-	return ret;
-}
-
+int gettimeofday(struct timeval *tv, struct timezone *tz)
+__attribute__((weak, alias("__vdso_gettimeofday")));
 notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
 {
-	struct timespec ts;
 	struct vdso_data *vdata;
 	int ret;
+	unsigned long syscall_addr;
 
 	vdata = __get_datapage();
+	syscall_addr = get_syscall_addr(vdata, __NR_gettimeofday);
+	ret = ((int (*)(struct timeval *tv, struct timezone *tz))syscall_addr)(
+		tv, tz);
 
-	ret = do_realtime(&ts, vdata);
-	if (ret)
-		return gettimeofday_fallback(tv, tz);
+	return ret;
+}
 
-	if (tv) {
-		tv->tv_sec = ts.tv_sec;
-		tv->tv_usec = ts.tv_nsec / 1000;
-	}
-	if (tz) {
-		tz->tz_minuteswest = vdata->tz_minuteswest;
-		tz->tz_dsttime = vdata->tz_dsttime;
-	}
+int sched_yield(void)
+__attribute__((weak, alias("__vdso_sched_yield")));
+notrace int __vdso_sched_yield(void)
+{
+	struct vdso_data *vdata;
+	int ret;
+	unsigned long syscall_addr;
+
+	vdata = __get_datapage();
+	syscall_addr = get_syscall_addr(vdata, __NR_sched_yield);
+	ret = ((int (*)(void))syscall_addr)();
+
+	return ret;
+}
+
+int nanosleep(void)
+__attribute__((weak, alias("__vdso_nanosleep")));
+notrace int __vdso_nanosleep(const struct timespec *req, struct timespec *rem)
+{
+	struct vdso_data *vdata;
+	int ret;
+	unsigned long syscall_addr;
+
+	vdata = __get_datapage();
+	syscall_addr = get_syscall_addr(vdata, __NR_nanosleep);
+	ret = ((int (*)(const struct timespec *req, struct timespec *rem))syscall_addr)(
+		req, rem);
+
+	return ret;
+}
+
+signed long kernel_sched_timeout(signed long timeout)
+__attribute__((weak, alias("__vdso_kernel_sched_timeout")));
+notrace signed long __vdso_kernel_sched_timeout(signed long timeout)
+{
+	struct vdso_data *vdata;
+	int ret;
+	unsigned long func_addr;
+
+	vdata = __get_datapage();
+	func_addr = vdata->kernel_sched_timeout;
+
+	ret = ((signed long (*)(signed long timeout))func_addr)(timeout);
 
 	return ret;
 }
