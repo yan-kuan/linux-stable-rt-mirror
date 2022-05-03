@@ -224,12 +224,26 @@ static inline void forget_syscall(struct pt_regs *regs)
 #define compat_thumb_mode(regs) (0)
 #endif
 
+#ifdef CONFIG_KERNEL_MODE_LINUX
+static inline int test_thread_flag_ku(void);
+#define user_mode(regs)	\
+	(((regs)->pstate & PSR_MODE_MASK) == PSR_MODE_EL0t || \
+	 (((regs)->pstate & PSR_MODE_MASK) == PSR_MODE_EL1h && test_thread_flag_ku()))
+
+#define compat_user_mode(regs)	\
+	(((regs)->pstate & (PSR_MODE32_BIT | PSR_MODE_MASK)) == \
+	 (PSR_MODE32_BIT | PSR_MODE_EL0t) || \
+	 (((regs)->pstate & (PSR_MODE32_BIT | PSR_MODE_MASK)) == \
+	 (PSR_MODE32_BIT | PSR_MODE_EL1h) && test_thread_flag_ku()))
+
+#else
 #define user_mode(regs)	\
 	(((regs)->pstate & PSR_MODE_MASK) == PSR_MODE_EL0t)
 
 #define compat_user_mode(regs)	\
 	(((regs)->pstate & (PSR_MODE32_BIT | PSR_MODE_MASK)) == \
 	 (PSR_MODE32_BIT | PSR_MODE_EL0t))
+#endif /* CONFIG_KERNEL_MODE_LINUX */
 
 #define processor_mode(regs) \
 	((regs)->pstate & PSR_MODE_MASK)

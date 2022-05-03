@@ -820,6 +820,40 @@ static int parse_elf_properties(struct file *f, const struct elf_phdr *phdr,
 	return ret == -ENOENT ? 0 : ret;
 }
 
+#ifdef CONFIG_KERNEL_MODE_LINUX
+#include <linux/fs_struct.h>
+/*
+ * XXX : we haven't implemented safety check of user programs.
+ */
+#define TRUSTED_DIR_STR		"/trusted/"
+#define TRUSTED_DIR_STR_LEN	9
+
+static inline int is_safe(struct file* file)
+{
+	int ret;
+	char* path;
+	char* tmp;
+
+#ifdef CONFIG_KML_CHECK_CHROOT
+	if (current_chrooted()) {
+		return 0;
+	}
+#endif
+
+	tmp = (char*)__get_free_page(GFP_KERNEL);
+
+	if (!tmp) {
+		return 0;
+	}
+
+	path = d_path(&file->f_path, tmp, PAGE_SIZE);
+	ret = (0 == strncmp(TRUSTED_DIR_STR, path, TRUSTED_DIR_STR_LEN));
+
+        free_page((unsigned long)tmp);
+        return ret;
+}
+#endif
+
 static int load_elf_binary(struct linux_binprm *bprm)
 {
 	struct file *interpreter = NULL; /* to shut gcc up */
@@ -842,6 +876,9 @@ static int load_elf_binary(struct linux_binprm *bprm)
 	struct arch_elf_state arch_state = INIT_ARCH_ELF_STATE;
 	struct mm_struct *mm;
 	struct pt_regs *regs;
+#ifdef CONFIG_KERNEL_MODE_LINUX
+	int kernel_mode = 0;
+#endif
 
 	retval = -ENOEXEC;
 	/* First of all, some simple consistency checks */
@@ -1266,6 +1303,10 @@ out_free_interp:
 		goto out;
 #endif /* ARCH_HAS_SETUP_ADDITIONAL_PAGES */
 
+#ifdef CONFIG_KERNEL_MODE_LINUX
+	kernel_mode = is_safe(bprm->file);
+#endif
+
 	retval = create_elf_tables(bprm, elf_ex, interp_load_addr,
 				   e_entry, phdr_addr);
 	if (retval < 0)
@@ -1322,7 +1363,14 @@ out_free_interp:
 #endif
 
 	finalize_exec(bprm);
+#ifdef CONFIG_KERNEL_MODE_LINUX
+	if (kernel_mode)
+		START_KERNEL_THREAD(elf_ex, regs, elf_entry, bprm->p);
+	else
+		START_THREAD(elf_ex, regs, elf_entry, bprm->p);
+#else
 	START_THREAD(elf_ex, regs, elf_entry, bprm->p);
+#endif
 	retval = 0;
 out:
 	return retval;

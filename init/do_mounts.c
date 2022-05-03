@@ -35,6 +35,10 @@ static int root_wait;
 
 dev_t ROOT_DEV;
 
+#ifdef CONFIG_KERNEL_MODE_LINUX
+struct path* boot_root;
+#endif
+
 static int __init load_ramdisk(char *str)
 {
 	pr_warn("ignoring the deprecated load_ramdisk= option\n");
@@ -647,6 +651,10 @@ out:
 	devtmpfs_mount();
 	init_mount(".", "/", NULL, MS_MOVE, NULL);
 	init_chroot(".");
+#ifdef CONFIG_KERNEL_MODE_LINUX
+	boot_root = &current->fs->root;
+	path_get(boot_root);
+#endif
 }
 
 static bool is_tmpfs;

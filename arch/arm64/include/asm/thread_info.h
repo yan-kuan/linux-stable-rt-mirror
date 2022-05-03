@@ -83,6 +83,9 @@ int arch_dup_task_struct(struct task_struct *dst,
 #define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
 #define TIF_SSBD		25	/* Wants SSB mitigation */
 #define TIF_TAGGED_ADDR		26	/* Allow tagged user addresses */
+#ifdef CONFIG_KERNEL_MODE_LINUX
+#define TIF_KU			27
+#endif /* CONFIG_KERNEL_MODE_LINUX */
 
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
 #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
@@ -100,6 +103,9 @@ int arch_dup_task_struct(struct task_struct *dst,
 #define _TIF_MTE_ASYNC_FAULT	(1 << TIF_MTE_ASYNC_FAULT)
 #define _TIF_NOTIFY_SIGNAL	(1 << TIF_NOTIFY_SIGNAL)
 #define _TIF_NEED_RESCHED_LAZY	(1 << TIF_NEED_RESCHED_LAZY)
+#ifdef CONFIG_KERNEL_MODE_LINUX
+#define _TIF_KU			(1 << TIF_KU)
+#endif /* CONFIG_KERNEL_MODE_LINUX */
 
 #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_NEED_RESCHED_LAZY | \
 				 _TIF_SIGPENDING | \
@@ -127,5 +133,26 @@ int arch_dup_task_struct(struct task_struct *dst,
 	.preempt_count	= INIT_PREEMPT_COUNT,				\
 	INIT_SCS							\
 }
+
+#ifndef __ASSEMBLY__
+#ifdef CONFIG_KERNEL_MODE_LINUX
+// /*
+//  * how to get the thread information struct from C
+//  */
+// static inline struct thread_info *current_thread_info(void) __attribute_const__;
+
+// static inline struct thread_info *current_thread_info(void)
+// {
+// 	return (struct thread_info *)
+// 		(current_stack_pointer & ~(THREAD_SIZE - 1));
+// }
+
+static inline int test_ti_thread_flag(struct thread_info *ti, int flag);
+static inline int test_thread_flag_ku(void)
+{
+	return test_ti_thread_flag(current_thread_info(), TIF_KU);
+}
+#endif /* CONFIG_KERNEL_MODE_LINUX */
+#endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_THREAD_INFO_H */
