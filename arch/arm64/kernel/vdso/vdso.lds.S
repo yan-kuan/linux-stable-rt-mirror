@@ -83,6 +83,12 @@ VERSION
 		__kernel_gettimeofday;
 		__kernel_clock_gettime;
 		__kernel_clock_getres;
+		clock_gettime;
+		gettimeofday;
+		kernel_sched_timeout;
+		__vdso_kernel_sched_timeout;
+		sched_yield;
+		__vdso_sched_yield;
 	local: *;
 	};
 }

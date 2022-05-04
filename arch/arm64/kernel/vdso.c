@@ -28,6 +28,8 @@
 #include <asm/cacheflush.h>
 #include <asm/signal32.h>
 #include <asm/vdso.h>
+#include <asm/syscall.h>
+#include <linux/sched.h>
 
 extern char vdso_start[], vdso_end[];
 extern char vdso32_start[], vdso32_end[];
@@ -85,7 +87,7 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
 
 	return 0;
 }
-
+void update_vdso_data(void);
 static int __init __vdso_init(enum vdso_abi abi)
 {
 	int i;
@@ -116,6 +118,8 @@ static int __init __vdso_init(enum vdso_abi abi)
 
 	vdso_info[abi].cm->pages = vdso_pagelist;
 
+	/* systemcall */
+	update_vdso_data();
 	return 0;
 }
 
