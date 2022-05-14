@@ -188,3 +188,27 @@ void do_el0_svc_compat(struct pt_regs *regs)
 		       compat_sys_call_table);
 }
 #endif
+
+#ifdef CONFIG_KERNEL_MODE_LINUX
+
+static void el1_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+			   const syscall_fn_t syscall_table[])
+{
+	el0_svc_common(regs, scno, sc_nr, syscall_table);
+}
+
+void do_el1_svc(struct pt_regs *regs)
+{
+	sve_user_discard();
+	el1_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
+}
+
+#ifdef CONFIG_COMPAT
+void do_el1_svc_compat(struct pt_regs *regs)
+{
+	el1_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
+		       compat_sys_call_table);
+}
+#endif
+
+#endif /* CONFIG_KERNEL_MODE_LINUX */

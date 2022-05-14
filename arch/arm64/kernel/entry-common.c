@@ -398,6 +398,18 @@ static void noinstr el1_fpac(struct pt_regs *regs, unsigned long esr)
 	exit_to_kernel_mode(regs);
 }
 
+#ifdef CONFIG_KERNEL_MODE_LINUX
+static void noinstr el1_svc(struct pt_regs *regs)
+{
+	enter_from_kernel_mode(regs);
+	local_daif_inherit(regs);
+	// cortex_a76_erratum_1463225_svc_handler();
+	do_el1_svc(regs);
+	local_daif_mask();
+	exit_to_kernel_mode(regs);
+}
+#endif
+
 asmlinkage void noinstr el1h_64_sync_handler(struct pt_regs *regs)
 {
 	unsigned long esr = read_sysreg(esr_el1);
@@ -427,6 +439,11 @@ asmlinkage void noinstr el1h_64_sync_handler(struct pt_regs *regs)
 	case ESR_ELx_EC_FPAC:
 		el1_fpac(regs, esr);
 		break;
+#ifdef CONFIG_KERNEL_MODE_LINUX
+	case ESR_ELx_EC_SVC64:
+		el1_svc(regs);
+		break;
+#endif
 	default:
 		__panic_unhandled(regs, "64-bit el1h sync", esr);
 	}

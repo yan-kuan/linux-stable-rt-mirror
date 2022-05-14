@@ -75,5 +75,10 @@ void do_ptrauth_fault(struct pt_regs *regs, unsigned int esr);
 void do_serror(struct pt_regs *regs, unsigned int esr);
 void do_notify_resume(struct pt_regs *regs, unsigned long thread_flags);
 
+#ifdef CONFIG_KERNEL_MODE_LINUX
+//void bad_el1_sync(struct pt_regs *regs, int reason, unsigned int esr);
+void do_el1_svc(struct pt_regs *regs);
+void do_el1_svc_compat(struct pt_regs *regs);
+#endif
 void panic_bad_stack(struct pt_regs *regs, unsigned int esr, unsigned long far);
 #endif	/* __ASM_EXCEPTION_H */
