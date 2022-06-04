@@ -252,7 +252,7 @@ static inline void start_kernel_thread(struct pt_regs *regs, unsigned long pc,
 				       unsigned long sp)
 {
 	start_thread_common(regs, pc);
-	regs->pstate = PSR_MODE_EL1h;
+	regs->pstate = PSR_MODE_EL1t;
 	spectre_v4_enable_task_mitigation(current);
 	regs->sp = sp;
 
