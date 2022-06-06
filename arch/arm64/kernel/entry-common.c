@@ -343,7 +343,7 @@ static bool cortex_a76_erratum_1463225_debug_handler(struct pt_regs *regs)
 }
 #endif /* CONFIG_ARM64_ERRATUM_1463225 */
 
-UNHANDLED(el1t, 64, sync)
+//UNHANDLED(el1t, 64, sync)
 UNHANDLED(el1t, 64, irq)
 UNHANDLED(el1t, 64, fiq)
 UNHANDLED(el1t, 64, error)
@@ -439,11 +439,6 @@ asmlinkage void noinstr el1h_64_sync_handler(struct pt_regs *regs)
 	case ESR_ELx_EC_FPAC:
 		el1_fpac(regs, esr);
 		break;
-#ifdef CONFIG_KERNEL_MODE_LINUX
-	case ESR_ELx_EC_SVC64:
-		el1_svc(regs);
-		break;
-#endif
 	default:
 		__panic_unhandled(regs, "64-bit el1h sync", esr);
 	}
@@ -855,3 +850,42 @@ __sdei_handler(struct pt_regs *regs, struct sdei_registered_event *arg)
 	return ret;
 }
 #endif /* CONFIG_ARM_SDE_INTERFACE */
+
+asmlinkage void noinstr el1t_64_sync_handler(struct pt_regs *regs)
+{
+	unsigned long esr = read_sysreg(esr_el1);
+
+	switch (ESR_ELx_EC(esr)) {
+	case ESR_ELx_EC_DABT_CUR:
+	case ESR_ELx_EC_IABT_CUR:
+		el1_abort(regs, esr);
+		break;
+	/*
+	 * We don't handle ESR_ELx_EC_SP_ALIGN, since we will have hit a
+	 * recursive exception when trying to push the initial pt_regs.
+	 */
+	case ESR_ELx_EC_PC_ALIGN:
+		el1_pc(regs, esr);
+		break;
+	case ESR_ELx_EC_SYS64:
+	case ESR_ELx_EC_UNKNOWN:
+		el1_undef(regs);
+		break;
+	case ESR_ELx_EC_BREAKPT_CUR:
+	case ESR_ELx_EC_SOFTSTP_CUR:
+	case ESR_ELx_EC_WATCHPT_CUR:
+	case ESR_ELx_EC_BRK64:
+		el1_dbg(regs, esr);
+		break;
+	case ESR_ELx_EC_FPAC:
+		el1_fpac(regs, esr);
+		break;
+#ifdef CONFIG_KERNEL_MODE_LINUX
+	case ESR_ELx_EC_SVC64:
+		el1_svc(regs);
+		break;
+#endif
+	default:
+		__panic_unhandled(regs, "64-bit el1h sync", esr);
+	}
+}
